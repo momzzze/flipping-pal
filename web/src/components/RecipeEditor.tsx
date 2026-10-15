@@ -280,7 +280,7 @@ export function RecipeEditor({ selectedId, onSelect }: { selectedId: number | nu
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RecipeForm key={`${selected.id}-${selected.manuallyEdited}`} recipe={selected} />
+              <RecipeForm key={selected.id} recipe={selected} />
             </CardContent>
           </Card>
         ) : (

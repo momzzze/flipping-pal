@@ -1,0 +1,64 @@
+# Azeroth Flip - local stack.
+#   Database only (for `npm run dev:*`):  docker compose up -d postgres
+#   Full stack (api + web + db):          docker compose up -d --build
+#   Optional Redis (future BullMQ jobs):  docker compose --profile queue up -d redis
+name: azeroth-flip
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-azeroth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azeroth}
+      POSTGRES_DB: ${POSTGRES_DB:-azeroth_flip}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-azeroth} -d ${POSTGRES_DB:-azeroth_flip}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["queue"]
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-azeroth}:${POSTGRES_PASSWORD:-azeroth}@postgres:5432/${POSTGRES_DB:-azeroth_flip}?schema=public"
+      PORT: 3000
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-5173}
+      BLIZZARD_CLIENT_ID: ${BLIZZARD_CLIENT_ID:-}
+      BLIZZARD_CLIENT_SECRET: ${BLIZZARD_CLIENT_SECRET:-}
+      BLIZZARD_REGION: ${BLIZZARD_REGION:-eu}
+      BLIZZARD_LOCALE: ${BLIZZARD_LOCALE:-en_GB}
+      TARGET_EXPANSION_NAME: ${TARGET_EXPANSION_NAME:-Midnight}
+      AUCTION_REFRESH_INTERVAL_MINUTES: ${AUCTION_REFRESH_INTERVAL_MINUTES:-0}
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-5173}:80"
+
+volumes:
+  pgdata:

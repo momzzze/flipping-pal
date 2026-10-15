@@ -173,7 +173,7 @@ export function SettingsView({ status }: { status: Status | undefined }) {
                 </SelectContent>
               </Select>
               {modifiers.data && activeProfessionId !== undefined && (
-                <ModifiersForm key={`${activeProfessionId}-${modifiers.dataUpdatedAt}`} professionId={activeProfessionId} initial={modifiers.data} />
+                <ModifiersForm key={activeProfessionId} professionId={activeProfessionId} initial={modifiers.data} />
               )}
               <InlineError error={modifiers.error} />
             </>
