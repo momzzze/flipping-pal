@@ -1,0 +1,248 @@
+// Azeroth Flip - normalized data model for WoW Auction House & crafting analysis.
+// All prices are stored in copper (1 gold = 100 silver = 10,000 copper) as BigInt.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Region {
+  EU
+  US
+  KR
+  TW
+}
+
+/// Where a piece of reference data originated from.
+enum DataSource {
+  BLIZZARD
+  MANUAL
+  SAMPLE
+}
+
+enum AuctionScope {
+  /// Region-wide commodity Auction House (stackable goods: herbs, potions, ...).
+  COMMODITY
+  /// Connected-realm Auction House (non-commodity items).
+  REALM
+}
+
+enum ItemQuality {
+  POOR
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+  ARTIFACT
+  HEIRLOOM
+  UNKNOWN
+}
+
+model Expansion {
+  id         Int         @id @default(autoincrement())
+  slug       String      @unique
+  name       String
+  /// Higher = newer. Used for ordering and "current expansion" logic.
+  sortOrder  Int         @default(0)
+  skillTiers SkillTier[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Profession {
+  /// Blizzard profession id (e.g. 171 = Alchemy). Sample data uses ids >= 9_000_000.
+  id         Int                       @id
+  name       String
+  iconUrl    String?
+  source     DataSource                @default(BLIZZARD)
+  skillTiers SkillTier[]
+  recipes    Recipe[]
+  modifiers  CraftingModifierProfile[]
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+}
+
+/// An expansion-specific branch of a profession (e.g. "Midnight Alchemy").
+model SkillTier {
+  /// Blizzard skill tier id.
+  id           Int        @id
+  name         String
+  professionId Int
+  profession   Profession @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  expansionId  Int?
+  expansion    Expansion? @relation(fields: [expansionId], references: [id], onDelete: SetNull)
+  minSkill     Int?
+  maxSkill     Int?
+  source       DataSource @default(BLIZZARD)
+  recipes      Recipe[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([professionId])
+  @@index([expansionId])
+}
+
+model Item {
+  /// Blizzard item id. Sample data uses ids >= 9_000_000.
+  id              Int         @id
+  name            String
+  quality         ItemQuality @default(UNKNOWN)
+  iconUrl         String?
+  itemClass       String?
+  itemSubclass    String?
+  /// Commodity items are traded on the region-wide AH.
+  isCommodity     Boolean     @default(true)
+  /// Crafting quality rank (1-3 for reagents/crafted goods since Dragonflight), null when not applicable.
+  craftingQuality Int?
+  /// Groups quality variants of the same reagent/item (e.g. rank 1/2/3 of one herb).
+  qualityGroupKey String?
+  vendorBuyPrice  BigInt?
+  vendorSellPrice BigInt?
+  source          DataSource  @default(BLIZZARD)
+  lastSyncedAt    DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  outputOf       Recipe[]            @relation("RecipeOutput")
+  reagentOf      RecipeReagent[]
+  priceSnapshots ItemPriceSnapshot[]
+
+  @@index([name])
+  @@index([qualityGroupKey])
+}
+
+model Recipe {
+  id                      Int              @id @default(autoincrement())
+  /// Blizzard recipe id (null for purely manual recipes).
+  blizzardRecipeId        Int?             @unique
+  name                    String
+  professionId            Int
+  profession              Profession       @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  skillTierId             Int?
+  skillTier               SkillTier?       @relation(fields: [skillTierId], references: [id], onDelete: SetNull)
+  category                String?
+  outputItemId            Int?
+  outputItem              Item?            @relation("RecipeOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+  outputQuantityMin       Int              @default(1)
+  outputQuantityMax       Int              @default(1)
+  /// Future crafting mechanics. Eligibility flags are stored now so the engine can use them later.
+  multicraftEligible      Boolean          @default(false)
+  resourcefulnessEligible Boolean          @default(false)
+  concentrationEligible   Boolean          @default(false)
+  /// True when the recipe has an output item and at least one required reagent.
+  isComplete              Boolean          @default(false)
+  /// When true, Blizzard re-imports will not overwrite output/reagents.
+  manuallyEdited          Boolean          @default(false)
+  source                  DataSource       @default(BLIZZARD)
+  notes                   String?
+  reagents                RecipeReagent[]
+  watchlistEntries        WatchlistEntry[]
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  @@index([professionId])
+  @@index([skillTierId])
+}
+
+model RecipeReagent {
+  id                        Int     @id @default(autoincrement())
+  recipeId                  Int
+  recipe                    Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  itemId                    Int
+  item                      Item    @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  quantity                  Int
+  /// Optional/finishing reagents are excluded from base cost calculations.
+  isOptional                Boolean @default(false)
+  /// Blizzard modified crafting slot id for quality reagents, if any.
+  slotId                    Int?
+  /// Whether resourcefulness can refund this reagent (basic reagents usually can).
+  affectedByResourcefulness Boolean @default(true)
+
+  @@unique([recipeId, itemId])
+  @@index([itemId])
+}
+
+model ConnectedRealm {
+  /// Blizzard connected realm id.
+  id         Int      @id
+  region     Region
+  name       String
+  realmSlugs String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+/// One Auction House pull (commodities for a region, or one connected realm).
+model AuctionSnapshot {
+  id                 Int                 @id @default(autoincrement())
+  region             Region
+  scope              AuctionScope
+  connectedRealmId   Int?
+  /// Sample snapshots are fabricated demo data and must never be presented as live prices.
+  isSample           Boolean             @default(false)
+  /// Last-Modified header returned by Blizzard, used for conditional requests.
+  sourceLastModified DateTime?
+  fetchedAt          DateTime            @default(now())
+  auctionCount       Int                 @default(0)
+  itemCount          Int                 @default(0)
+  prices             ItemPriceSnapshot[]
+
+  @@index([region, scope, connectedRealmId, fetchedAt])
+}
+
+/// Aggregated per-item price data for a snapshot. Active listings = supply, not demand.
+model ItemPriceSnapshot {
+  id              Int             @id @default(autoincrement())
+  snapshotId      Int
+  snapshot        AuctionSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  itemId          Int
+  item            Item            @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  minUnitPrice    BigInt
+  /// Quantity-weighted average of the cheapest 10% of supply (robust "market" price).
+  marketUnitPrice BigInt
+  medianUnitPrice BigInt
+  /// Total units listed (supply).
+  totalQuantity   Int
+  /// Number of distinct auction listings.
+  listingCount    Int
+  /// Ascending price tiers: [{ "unitPrice": number, "quantity": number }] (capped).
+  priceTiers      Json
+
+  @@unique([snapshotId, itemId])
+  @@index([itemId])
+}
+
+model WatchlistEntry {
+  id           Int      @id @default(autoincrement())
+  recipeId     Int      @unique
+  recipe       Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  note         String?
+  /// Optional alert threshold in copper.
+  targetProfit BigInt?
+  createdAt    DateTime @default(now())
+}
+
+/// Player crafting stats per profession, used by the engine for multicraft/resourcefulness/concentration.
+model CraftingModifierProfile {
+  id                     Int        @id @default(autoincrement())
+  professionId           Int
+  profession             Profession @relation(fields: [professionId], references: [id], onDelete: Cascade)
+  name                   String     @default("Default")
+  /// 0..1 chance to proc multicraft.
+  multicraftChance       Float      @default(0)
+  /// Average extra output multiplier when multicraft procs (e.g. 1.25 => +125% of base output).
+  multicraftYieldBonus   Float      @default(0)
+  /// 0..1 chance to proc resourcefulness per reagent.
+  resourcefulnessChance  Float      @default(0)
+  /// 0..1 fraction of reagents saved when resourcefulness procs.
+  resourcefulnessSavings Float      @default(0)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  @@unique([professionId, name])
+}
