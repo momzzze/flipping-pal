@@ -1,35 +1,39 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Dashboard } from '@/components/Dashboard'
+import { DataModeBanner } from '@/components/DataModeBanner'
+import { ErrorState } from '@/components/ErrorState'
+import { RecipeEditor } from '@/components/RecipeEditor'
+import { SettingsView } from '@/components/SettingsView'
+import { TopNav, type View } from '@/components/TopNav'
+import { useStatus } from '@/hooks/queries'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [view, setView] = useState<View>('dashboard')
+  const [editingRecipeId, setEditingRecipeId] = useState<number | null>(null)
+  const status = useStatus()
+
+  const editRecipe = (recipeId: number) => {
+    setEditingRecipeId(recipeId)
+    setView('recipes')
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      <TopNav view={view} onViewChange={setView} status={status.data} />
+      <DataModeBanner status={status.data} />
+      {status.isError && (
+        <div className="p-4">
+          <ErrorState
+            title="Cannot reach the Azeroth Flip API"
+            error={status.error}
+            onRetry={() => void status.refetch()}
+          />
+        </div>
+      )}
+      {view === 'dashboard' && <Dashboard key="dashboard" onEditRecipe={editRecipe} />}
+      {view === 'watchlist' && <Dashboard key="watchlist" watchlistMode onEditRecipe={editRecipe} />}
+      {view === 'recipes' && <RecipeEditor selectedId={editingRecipeId} onSelect={setEditingRecipeId} />}
+      {view === 'settings' && <SettingsView status={status.data} />}
+    </div>
   )
 }
-
-export default App
