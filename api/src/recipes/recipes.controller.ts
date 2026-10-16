@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   CreateRecipeDto,
+  ImportClassicForeverCatalogDto,
   ImportRecipesDto,
   ListRecipesQueryDto,
   UpdateRecipeDto,
@@ -31,6 +32,11 @@ export class RecipesController {
   @Post('import')
   import(@Body() dto: ImportRecipesDto) {
     return this.recipes.importFromBlizzard(dto.professionId, dto.skillTierId);
+  }
+
+  @Post('import/classic-forever')
+  importClassicForever(@Body() dto: ImportClassicForeverCatalogDto) {
+    return this.recipes.importClassicForeverCatalog(dto);
   }
 
   @Post()

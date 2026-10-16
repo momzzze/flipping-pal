@@ -7,6 +7,7 @@ export const queryKeys = {
   professions: ['professions'] as const,
   expansions: ['expansions'] as const,
   realms: ['connected-realms'] as const,
+  scanItems: (snapshotId: number, search: string, offset: number) => ['scan-items', snapshotId, search, offset] as const,
   profits: (filters: Filters) => ['profits', filters] as const,
   breakdown: (recipeId: number, params: object) => ['breakdown', recipeId, params] as const,
   history: (recipeId: number) => ['recipe-history', recipeId] as const,
@@ -19,6 +20,14 @@ export const useStatus = () => useQuery({ queryKey: queryKeys.status, queryFn: a
 export const useProfessions = () => useQuery({ queryKey: queryKeys.professions, queryFn: api.professions })
 export const useExpansions = () => useQuery({ queryKey: queryKeys.expansions, queryFn: api.expansions })
 export const useConnectedRealms = () => useQuery({ queryKey: queryKeys.realms, queryFn: api.connectedRealms })
+
+export const useScanItems = (snapshotId: number | undefined, search: string, offset: number, limit = 50) =>
+  useQuery({
+    queryKey: queryKeys.scanItems(snapshotId ?? 0, search, offset),
+    queryFn: () => api.snapshotItems(snapshotId!, { search, offset, limit }),
+    enabled: snapshotId !== undefined,
+    placeholderData: keepPreviousData,
+  })
 
 export const useProfits = (filters: Filters) =>
   useQuery({

@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -94,10 +96,108 @@ export class ImportRecipesDto {
   @IsInt()
   professionId?: number;
 
-  /** Explicit skill tier id; defaults to the tier matching TARGET_EXPANSION_NAME, else the newest. */
+  /** Explicit skill tier id; otherwise selects only a tier matching TARGET_EXPANSION_NAME. */
   @IsOptional()
   @IsInt()
   skillTierId?: number;
+}
+
+export class CatalogItemDto {
+  @IsInt()
+  @Min(1)
+  id!: number;
+
+  @IsString()
+  @MaxLength(200)
+  name!: string;
+}
+
+export class ForeverBetaReagentDto {
+  @ValidateNested()
+  @Type(() => CatalogItemDto)
+  item!: CatalogItemDto;
+
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isOptional?: boolean;
+}
+
+export class ForeverBetaRecipeDto {
+  @IsString()
+  @MaxLength(100)
+  externalId!: string;
+
+  @IsString()
+  @MaxLength(200)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  category?: string;
+
+  @ValidateNested()
+  @Type(() => CatalogItemDto)
+  outputItem!: CatalogItemDto;
+
+  @IsInt()
+  @Min(1)
+  outputQuantityMin!: number;
+
+  @IsInt()
+  @Min(1)
+  outputQuantityMax!: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => ForeverBetaReagentDto)
+  reagents!: ForeverBetaReagentDto[];
+}
+
+export class ImportClassicForeverCatalogDto {
+  @IsInt()
+  @Min(1)
+  professionId!: number;
+
+  @IsString()
+  @MaxLength(100)
+  professionName!: string;
+
+  @IsInt()
+  @Min(1)
+  skillTierId!: number;
+
+  @IsString()
+  @MaxLength(150)
+  skillTierName!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minSkill?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxSkill?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  catalogVersion?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(2000)
+  @ValidateNested({ each: true })
+  @Type(() => ForeverBetaRecipeDto)
+  recipes!: ForeverBetaRecipeDto[];
 }
 
 export class ListRecipesQueryDto {

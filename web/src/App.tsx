@@ -3,6 +3,7 @@ import { Dashboard } from '@/components/Dashboard'
 import { DataModeBanner } from '@/components/DataModeBanner'
 import { ErrorState } from '@/components/ErrorState'
 import { RecipeEditor } from '@/components/RecipeEditor'
+import { ScanDataView } from '@/components/ScanDataView'
 import { SettingsView } from '@/components/SettingsView'
 import { TopNav, type View } from '@/components/TopNav'
 import { useStatus } from '@/hooks/queries'
@@ -32,6 +33,7 @@ export default function App() {
       )}
       {view === 'dashboard' && <Dashboard key="dashboard" onEditRecipe={editRecipe} />}
       {view === 'watchlist' && <Dashboard key="watchlist" watchlistMode onEditRecipe={editRecipe} />}
+      {view === 'scan' && <ScanDataView snapshot={status.data?.latestScanSnapshot ?? null} />}
       {view === 'recipes' && <RecipeEditor selectedId={editingRecipeId} onSelect={setEditingRecipeId} />}
       {view === 'settings' && <SettingsView status={status.data} />}
     </div>

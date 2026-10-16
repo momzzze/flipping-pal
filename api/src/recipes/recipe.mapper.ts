@@ -23,6 +23,8 @@ export interface RecipeReagentDto {
 export interface RecipeDto {
   id: number;
   blizzardRecipeId: number | null;
+  externalId: string | null;
+  catalogVersion: string | null;
   name: string;
   professionId: number;
   professionName: string;
@@ -48,6 +50,8 @@ export function toRecipeDto(recipe: RecipeWithRelations): RecipeDto {
   return {
     id: recipe.id,
     blizzardRecipeId: recipe.blizzardRecipeId,
+    externalId: recipe.externalId,
+    catalogVersion: recipe.catalogVersion,
     name: recipe.name,
     professionId: recipe.professionId,
     professionName: recipe.profession.name,

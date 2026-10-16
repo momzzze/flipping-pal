@@ -7,6 +7,15 @@ export class BlizzardCredentialsMissingError extends Error {
   }
 }
 
+export class BlizzardTargetUnsupportedError extends Error {
+  constructor() {
+    super(
+      'Blizzard Retail data is disabled in Classic Forever mode. Import a Classic Forever catalog and use its scan data instead.',
+    );
+    this.name = 'BlizzardTargetUnsupportedError';
+  }
+}
+
 export class BlizzardApiError extends Error {
   constructor(
     message: string,

@@ -27,7 +27,11 @@ async function bootstrap(): Promise<void> {
   logger.log(
     `Azeroth Flip API listening on http://localhost:${config.port}/api`,
   );
-  if (!config.blizzard.clientId || !config.blizzard.clientSecret) {
+  if (config.blizzard.targetExpansionName.toLowerCase().includes('forever')) {
+    logger.log(
+      'Classic Forever mode selected: Blizzard Retail imports and auction refreshes are disabled.',
+    );
+  } else if (!config.blizzard.clientId || !config.blizzard.clientSecret) {
     logger.warn(
       'BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET not set: live data disabled. Load SAMPLE data from the UI or POST /api/sample/load.',
     );

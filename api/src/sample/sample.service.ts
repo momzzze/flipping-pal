@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AuctionScope, DataSource } from '@prisma/client';
 import { aggregateListings } from '../auctions/auction-aggregation';
 import { AuctionsService } from '../auctions/auctions.service';
@@ -41,6 +41,11 @@ export class SampleService {
 
   /** Loads (or reloads) the explicitly labeled sample Alchemy dataset and sample price history. */
   async load(): Promise<{ items: number; recipes: number; snapshots: number }> {
+    if (this.blizzard.isClassicForeverMode) {
+      throw new BadRequestException(
+        'The Midnight sample dataset is disabled in Classic Forever mode.',
+      );
+    }
     await this.clear();
 
     await this.prisma.profession.upsert({

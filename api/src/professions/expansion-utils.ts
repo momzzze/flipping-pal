@@ -29,17 +29,14 @@ export function deriveExpansionName(
 }
 
 /**
- * Picks the skill tier to import: the one matching the target expansion name,
- * otherwise the newest tier (Blizzard skill tier ids increase with each expansion).
+ * Picks only the skill tier matching the configured target. Never substitute another expansion.
  */
 export function pickTargetSkillTier<T extends { id: number; name: string }>(
   tiers: readonly T[],
   targetExpansionName: string,
 ): T | undefined {
   const target = targetExpansionName.toLowerCase();
-  const match = tiers.find((tier) => tier.name.toLowerCase().includes(target));
-  if (match) return match;
-  return [...tiers].sort((a, b) => b.id - a.id)[0];
+  return tiers.find((tier) => tier.name.toLowerCase().includes(target));
 }
 
 function escapeRegExp(value: string): string {

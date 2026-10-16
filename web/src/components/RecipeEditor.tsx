@@ -83,6 +83,8 @@ function RecipeForm({ recipe }: { recipe: Recipe }) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{recipe.source}</Badge>
         {recipe.blizzardRecipeId && <Badge variant="outline">Blizzard recipe #{recipe.blizzardRecipeId}</Badge>}
+        {recipe.externalId && <Badge variant="outline">Catalog recipe {recipe.externalId}</Badge>}
+        {recipe.catalogVersion && <Badge variant="outline">Catalog {recipe.catalogVersion}</Badge>}
         {recipe.manuallyEdited && <Badge variant="secondary">Manually corrected — protected from re-import</Badge>}
         {!recipe.isComplete && <Badge variant="destructive">Incomplete</Badge>}
       </div>
@@ -276,7 +278,7 @@ export function RecipeEditor({ selectedId, onSelect }: { selectedId: number | nu
               <CardDescription>
                 {selected.professionName}
                 {selected.skillTierName ? ` · ${selected.skillTierName}` : ''}. Saved corrections are marked as manual and are
-                not overwritten by future Blizzard imports.
+                not overwritten by future catalog imports.
               </CardDescription>
             </CardHeader>
             <CardContent>

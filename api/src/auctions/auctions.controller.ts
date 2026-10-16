@@ -34,6 +34,20 @@ export class AuctionsController {
     return this.auctions.listSnapshots(parsePositiveInt(limit, 50));
   }
 
+  @Get('auctions/snapshots/:snapshotId/items')
+  listSnapshotItems(
+    @Param('snapshotId', ParseIntPipe) snapshotId: number,
+    @Query('q') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.auctions.listSnapshotItems(snapshotId, {
+      search,
+      limit: parsePositiveInt(limit, 50),
+      offset: offset && /^\d+$/.test(offset) ? Number(offset) : 0,
+    });
+  }
+
   @Get('connected-realms')
   listConnectedRealms() {
     return this.auctions.listConnectedRealms();

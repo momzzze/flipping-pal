@@ -1,12 +1,12 @@
 # Azeroth Flip
 
-**World of Warcraft Auction House & profession crafting profit analyzer** — initially targeting **WoW: Midnight** and the **EU** region, with a data model designed to grow with future expansions.
+**World of Warcraft profession crafting and auction analysis** — currently targeting **WoW Classic Forever**. Retail Blizzard imports and Midnight demo data are disabled for this target.
 
 Azeroth Flip pulls current Auction House prices from the official Blizzard Game Data API, maps profession recipes to their reagents and output items, and tells you which crafts are profitable right now:
 
 > A potion needs 2 × Herb A and 1 × Herb B. Azeroth Flip buys those reagents through the cheapest current listings (walking up the price tiers for larger batches), compares the total against the potion's selling price, deducts the 5 % AH cut and shows the expected **net profit** and **ROI**.
 
-The first fully implemented workflow is **Alchemy + EU commodity prices**: Battle.net OAuth → recipe import → auction snapshot → profit engine → dashboard.
+The app has a versioned Classic Forever profession-catalog importer. Forever recipe records and auction scans must come from verified Forever data; they are not populated from Blizzard Retail or Midnight sample records.
 
 ---
 
@@ -35,7 +35,7 @@ The first fully implemented workflow is **Alchemy + EU commodity prices**: Battl
 | --- | --- |
 | Blizzard integration | OAuth **client credentials** flow (token cached and refreshed automatically), Game Data API client with request throttling, retry with exponential back-off on `429`/`5xx` (honours `Retry-After`), one automatic token refresh on `401`, `If-Modified-Since` support for auction endpoints, in-memory caching of static data. Credentials stay server-side in environment variables. |
 | Auctions | EU region-wide **commodity** auctions and selected **connected-realm** auctions. Listings are aggregated per item into price tiers (unit price → quantity), min / median / market price, supply and listing counts. |
-| Recipes | Import of professions, the target expansion skill tier (Midnight), recipes, reagents, output items and crafting quantities into a normalized schema. Incomplete mappings are flagged and can be **corrected manually** in the UI; manual corrections are protected from being overwritten by future imports. |
+| Recipes | Import versioned Classic Forever profession catalogs with recipe outputs, reagents and quantities. Incomplete mappings can be **corrected manually**; corrections are protected from later catalog imports. |
 | Profit engine | Material cost from current price tiers, expected revenue, AH fee, net profit and ROI. Large batches walk up the reagent price tiers, insufficient supply is flagged, missing prices never become fake zeros. Multicraft and resourcefulness expectations are applied to eligible recipes. Covered by unit tests. |
 | Dashboard | Dark-themed UI with top navigation, filter sidebar, large sortable results table (icon, item name/quality, material cost, sell price, AH fee, profit, ROI, supply/listings, reagent depth) and a recipe details panel (materials, per-reagent tier pricing, revenue breakdown, profit trend). |
 | Filters | Profession, expansion, output quality, minimum profit per craft, minimum ROI, minimum output supply, number of crafts, sell-price strategy (lowest listing / market), connected realm, incomplete recipes, watchlist only, free-text search. |
@@ -169,8 +169,7 @@ Open <http://localhost:5173>.
 
 ### 7. Load data
 
-- **With Blizzard credentials:** click **Sync Alchemy** in the top bar. This imports the Alchemy recipes for the target expansion and fetches the current EU commodity auctions (the first import makes a few hundred API calls and can take a minute). Afterwards use **Refresh prices** (Blizzard updates commodity data roughly once per hour).
-- **Without credentials:** click **Load sample data** in the banner (or run `npm run db:seed-sample`). A yellow **SAMPLE DATA** banner stays visible while sample prices are in use.
+The active target is Classic Forever. Import a verified catalog with `POST /api/recipes/import/classic-forever`. Blizzard Retail sync and Midnight sample data are disabled. Auction-scan ingestion is not implemented yet.
 
 ### Windows tips
 
@@ -263,14 +262,15 @@ Base URL: `http://localhost:3000/api`. All money values are copper integers.
 | --- | --- | --- |
 | GET | `/health` | Liveness check |
 | GET | `/status` | Region, data mode (LIVE / SAMPLE / NONE), latest snapshots, recipe counts |
-| POST | `/sync` | Import Alchemy (or `{ "professionId" }`) recipes and force-refresh commodity prices |
+| POST | `/sync` | Legacy Retail operation; unavailable in Classic Forever mode |
 | GET | `/professions` | Imported professions with skill tiers and recipe counts |
 | GET | `/professions/remote` | Profession index from Blizzard |
 | POST | `/professions/:id/import` | Import a profession's target-expansion recipes |
 | GET | `/expansions` | Known expansions |
 | GET | `/recipes` | List recipes (`professionId`, `skillTierId`, `search`, `incomplete=true`) |
 | POST | `/recipes` | Create a manual recipe |
-| POST | `/recipes/import` | Import recipes (`{ professionId?, skillTierId? }`, defaults to Alchemy) |
+| POST | `/recipes/import` | Legacy Blizzard Retail import; unavailable in Classic Forever mode |
+| POST | `/recipes/import/classic-forever` | Import a versioned Classic Forever profession/recipe catalog (JSON body; no Blizzard API credentials required) |
 | GET / PATCH / DELETE | `/recipes/:id` | Get / manually correct / delete (non-Blizzard) a recipe |
 | POST | `/recipes/:id/reset-manual` | Allow a corrected recipe to be overwritten by the next import |
 | GET | `/items?q=` | Search items by name or ID |
@@ -279,6 +279,7 @@ Base URL: `http://localhost:3000/api`. All money values are copper integers.
 | POST | `/auctions/commodities/refresh?force=true` | Fetch EU commodity auctions and store a snapshot |
 | POST | `/auctions/realms/:connectedRealmId/refresh` | Fetch a connected realm's auctions |
 | GET | `/auctions/snapshots` | Recent snapshots |
+| GET | `/auctions/snapshots/:id/items?q=&limit=&offset=` | Paginated item prices from an imported scan snapshot |
 | GET | `/connected-realms` · POST `/connected-realms/sync` | Connected realm list / import from Blizzard |
 | GET | `/pricing/items/:id?realmId=` | Current price summary and tiers for an item |
 | GET | `/crafting/profits` | Profit table. Query: `professionId`, `skillTierId`, `expansionId`, `quality` (CSV), `minProfit` (copper per craft), `minRoi` (%), `minSupply`, `includeIncomplete`, `watchlistOnly`, `crafts`, `realmId`, `sellPriceStrategy` (`MIN`/`MARKET`), `search` |
@@ -291,6 +292,12 @@ Base URL: `http://localhost:3000/api`. All money values are copper integers.
 | POST | `/sample/load` · DELETE `/sample` | Load / remove the labeled sample dataset |
 
 Errors use the JSON shape `{ statusCode, error, message }`. Blizzard rate limits that persist after automatic retries surface as `429` (`BlizzardRateLimited`), other upstream failures as `502`, and missing credentials as `503` (`BlizzardCredentialsMissing`).
+
+### Classic Forever profession catalogs
+
+The Classic Forever importer is separate from Blizzard Retail and auction-price ingestion. Send `professionId`, `professionName`, `skillTierId`, `skillTierName`, optional `minSkill`, `maxSkill`, `catalogVersion`, and a non-empty `recipes` array. Each recipe needs a stable source `externalId`, `name`, output item `{ id, name }`, output quantity bounds, and reagent entries `{ item: { id, name }, quantity, isOptional? }`. Use IDs from the Classic Forever catalog; conflicting item IDs are rejected rather than merged. Re-imports update matching catalog recipes, while manually corrected recipes are preserved. No Classic Forever recipe data is bundled until it can be verified against a PTR export.
+
+Use `npm run import:classic-scan --workspace api -- "<path-to-AzerothFlipScanner.lua>"` to import the newest SavedVariables scan. The import is idempotent by scan ID. The **Scan Data** view and `GET /api/auctions/snapshots/:id/items` expose its prices independently of profession recipes.
 
 Example:
 
@@ -312,7 +319,7 @@ Invoke-RestMethod "http://localhost:3000/api/crafting/profits?minRoi=10&crafts=2
 | `BLIZZARD_CLIENT_ID` / `BLIZZARD_CLIENT_SECRET` | empty | Battle.net API client. Empty = sample mode only |
 | `BLIZZARD_REGION` | `eu` | API region |
 | `BLIZZARD_LOCALE` | `en_GB` | Locale for names |
-| `TARGET_EXPANSION_NAME` | `Midnight` | Skill tier to import (matched by name; falls back to the newest tier) |
+| `TARGET_EXPANSION_NAME` | `Classic Forever` | Target catalog. Blizzard Retail imports and Midnight samples are disabled when this contains `Forever`. |
 | `BLIZZARD_MAX_CONCURRENCY` / `BLIZZARD_MAX_REQUESTS_PER_SECOND` / `BLIZZARD_MAX_RETRIES` | `8` / `50` / `4` | Client-side throttling |
 | `AH_CUT_RATE` | `0.05` | Auction House cut |
 | `AUCTION_REFRESH_INTERVAL_MINUTES` | `0` | Automatic commodity refresh (0 = off; 60 recommended) |
@@ -362,7 +369,7 @@ The MVP prioritizes a working Alchemy + EU commodity workflow. Not yet implement
 - **Reagent quality variants.** Dragonflight-style crafting uses separate item IDs per reagent quality (rank 1/2/3). Blizzard's recipe endpoint lists one reagent item; quality alternatives and "cheapest quality" selection still need a mapping table (`Item.craftingQuality` is stored, the UI marks ranks with ★).
 - **Output quality / concentration math.** Concentration eligibility is stored but not yet used; skill-based output quality probabilities are not modeled.
 - **Optional/finishing reagents and modified (quality-slot) reagents** are imported only as far as the Blizzard API exposes them; some recipes will be flagged *incomplete* and need manual correction.
-- **Midnight skill tier detection** is by name (`TARGET_EXPANSION_NAME`). Before Blizzard publishes Midnight data, the newest available tier is used.
+- **Classic Forever data source.** No verified Forever profession catalog or auction scan is bundled yet; import these through the versioned catalog and scan workflows.
 - **Realm (non-commodity) items** with bonus IDs/item levels are aggregated by base item ID only.
 - **Sales velocity / demand** is not available from the Blizzard API. Supply is shown, demand is not estimated; a future version could infer it from snapshot-to-snapshot listing disappearance (with appropriate caveats).
 - **Deposits** and undercut/re-list costs are not included.

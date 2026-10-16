@@ -19,7 +19,7 @@ export class StatusService {
   ) {}
 
   async getStatus() {
-    const [snapshot, total, complete, sampleLoaded, lastLive] =
+    const [snapshot, total, complete, sampleLoaded, lastLive, latestScan] =
       await Promise.all([
         this.pricing.resolveCommoditySnapshot(),
         this.prisma.recipe.count(),
@@ -32,13 +32,24 @@ export class StatusService {
           },
           orderBy: { fetchedAt: 'desc' },
         }),
+        this.prisma.auctionSnapshot.findFirst({
+          where: { source: 'CLASSIC_FOREVER_SCAN' },
+          orderBy: { fetchedAt: 'desc' },
+        }),
       ]);
     return {
       region: this.blizzard.region.toUpperCase(),
       targetExpansionName: this.blizzard.targetExpansionName,
       blizzardConfigured: this.blizzard.isConfigured,
-      dataMode: snapshot ? (snapshot.isSample ? 'SAMPLE' : 'LIVE') : 'NONE',
+      dataMode: snapshot
+        ? snapshot.isSample
+          ? 'SAMPLE'
+          : 'LIVE'
+        : latestScan
+          ? 'SCAN'
+          : 'NONE',
       commoditySnapshot: snapshot ? toSnapshotDto(snapshot) : null,
+      latestScanSnapshot: latestScan ? toSnapshotDto(latestScan) : null,
       lastLiveSnapshot: lastLive ? toSnapshotDto(lastLive) : null,
       sampleDataLoaded: sampleLoaded,
       recipes: { total, complete, incomplete: total - complete },

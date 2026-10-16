@@ -13,6 +13,7 @@ import type {
   RecipeUpdate,
   RefreshResult,
   Status,
+  SnapshotItemsPage,
 } from './types'
 
 const BASE_URL = `${(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''}/api`
@@ -83,6 +84,8 @@ export const api = {
   professions: () => request<Profession[]>('/professions'),
   expansions: () => request<Expansion[]>('/expansions'),
   connectedRealms: () => request<ConnectedRealm[]>('/connected-realms'),
+  snapshotItems: (snapshotId: number, params: { search?: string; limit?: number; offset?: number }) =>
+    request<SnapshotItemsPage>(`/auctions/snapshots/${snapshotId}/items${toQuery(params)}`),
   syncConnectedRealms: () => request<{ count: number }>('/connected-realms/sync', { method: 'POST' }),
   profits: (filters: Filters) => request<ProfitTable>(`/crafting/profits${filtersToQuery(filters)}`),
   breakdown: (recipeId: number, params: { crafts: number; sellPriceStrategy: string; realmId?: number }) =>

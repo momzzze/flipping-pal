@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: Azeroth Flip Scanner
+## Notes: Saves a Classic Forever Auction House scan for Azeroth Flip.
+## Author: Azeroth Flip
+## Version: 0.1.0
+## SavedVariables: AzerothFlipScannerDB
+AzerothFlipScanner.lua

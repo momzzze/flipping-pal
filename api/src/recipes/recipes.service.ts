@@ -20,6 +20,7 @@ import {
 } from './recipe.mapper';
 import {
   CreateRecipeDto,
+  ImportClassicForeverCatalogDto,
   ListRecipesQueryDto,
   RecipeReagentInputDto,
   UpdateRecipeDto,
@@ -181,7 +182,7 @@ export class RecipesService {
   }
 
   /**
-   * Imports a profession skill tier (default: Alchemy for TARGET_EXPANSION_NAME) from Blizzard:
+  * Imports only the configured profession skill tier from Blizzard:
    * recipes, reagents, output items, crafted quantities. Manually edited recipes are preserved.
    */
   async importFromBlizzard(
@@ -258,6 +259,194 @@ export class RecipesService {
     this.logger.log(
       `Imported ${summary.imported}/${summary.total} recipes for ${tier.name} (${summary.incomplete} incomplete)`,
     );
+    return summary;
+  }
+
+  async importClassicForeverCatalog(dto: ImportClassicForeverCatalogDto) {
+    const externalIds = new Set<string>();
+    for (const recipe of dto.recipes) {
+      if (externalIds.has(recipe.externalId)) {
+        throw new BadRequestException(
+          `Recipe externalId ${recipe.externalId} appears more than once`,
+        );
+      }
+      externalIds.add(recipe.externalId);
+      if (recipe.outputQuantityMax < recipe.outputQuantityMin) {
+        throw new BadRequestException(
+          `Recipe ${recipe.name} has outputQuantityMax below outputQuantityMin`,
+        );
+      }
+      this.assertUniqueCatalogReagents(recipe.reagents);
+    }
+
+    const expansionSlug = 'classic-forever';
+    const summary = await this.prisma.$transaction(async (tx) => {
+      const expansion = await tx.expansion.upsert({
+        where: { slug: expansionSlug },
+        create: {
+          slug: expansionSlug,
+          name: 'Classic Forever',
+          sortOrder: 10000,
+        },
+        update: {},
+      });
+      await tx.profession.upsert({
+        where: { id: dto.professionId },
+        create: {
+          id: dto.professionId,
+          name: dto.professionName,
+          source: DataSource.FOREVER_BETA,
+        },
+        update: { name: dto.professionName },
+      });
+
+      const existingTier = await tx.skillTier.findUnique({
+        where: { id: dto.skillTierId },
+      });
+      if (
+        existingTier &&
+        (existingTier.professionId !== dto.professionId ||
+          existingTier.expansionId !== expansion.id)
+      ) {
+        throw new BadRequestException(
+          `Skill tier id ${dto.skillTierId} is already used outside Classic Forever`,
+        );
+      }
+      const skillTier = await tx.skillTier.upsert({
+        where: { id: dto.skillTierId },
+        create: {
+          id: dto.skillTierId,
+          name: dto.skillTierName,
+          professionId: dto.professionId,
+          expansionId: expansion.id,
+          minSkill: dto.minSkill,
+          maxSkill: dto.maxSkill,
+          source: DataSource.FOREVER_BETA,
+        },
+        update: {
+          name: dto.skillTierName,
+          minSkill: dto.minSkill,
+          maxSkill: dto.maxSkill,
+          source: DataSource.FOREVER_BETA,
+        },
+      });
+
+      const itemInputs = new Map<number, string>();
+      for (const recipe of dto.recipes) {
+        for (const item of [
+          recipe.outputItem,
+          ...recipe.reagents.map((reagent) => reagent.item),
+        ]) {
+          const existingName = itemInputs.get(item.id);
+          if (existingName && existingName !== item.name) {
+            throw new BadRequestException(
+              `Item id ${item.id} has conflicting names in the catalog`,
+            );
+          }
+          itemInputs.set(item.id, item.name);
+        }
+      }
+
+      for (const [id, name] of itemInputs) {
+        const existing = await tx.item.findUnique({ where: { id } });
+        if (
+          existing &&
+          existing.source !== DataSource.FOREVER_BETA &&
+          existing.name !== name
+        ) {
+          throw new BadRequestException(
+            `Item id ${id} already belongs to ${existing.name}; refusing to replace it with ${name}`,
+          );
+        }
+        if (!existing) {
+          await tx.item.create({
+            data: { id, name, source: DataSource.FOREVER_BETA },
+          });
+        } else if (existing.source === DataSource.FOREVER_BETA) {
+          await tx.item.update({ where: { id }, data: { name } });
+        }
+      }
+
+      const result = {
+        professionId: dto.professionId,
+        professionName: dto.professionName,
+        skillTierId: skillTier.id,
+        skillTierName: skillTier.name,
+        catalogVersion: dto.catalogVersion ?? null,
+        total: dto.recipes.length,
+        imported: 0,
+        complete: 0,
+        incomplete: 0,
+        skippedManual: 0,
+      };
+
+      for (const input of dto.recipes) {
+        const existing = await tx.recipe.findUnique({
+          where: {
+            source_externalId: {
+              source: DataSource.FOREVER_BETA,
+              externalId: input.externalId,
+            },
+          },
+        });
+        if (existing?.manuallyEdited) {
+          result.skippedManual += 1;
+          continue;
+        }
+
+        const complete = isRecipeComplete(input.outputItem.id, input.reagents);
+        const recipe = await tx.recipe.upsert({
+          where: {
+            source_externalId: {
+              source: DataSource.FOREVER_BETA,
+              externalId: input.externalId,
+            },
+          },
+          create: {
+            externalId: input.externalId,
+            name: input.name,
+            catalogVersion: dto.catalogVersion,
+            professionId: dto.professionId,
+            skillTierId: skillTier.id,
+            category: input.category,
+            outputItemId: input.outputItem.id,
+            outputQuantityMin: input.outputQuantityMin,
+            outputQuantityMax: input.outputQuantityMax,
+            isComplete: complete,
+            source: DataSource.FOREVER_BETA,
+          },
+          update: {
+            name: input.name,
+            catalogVersion: dto.catalogVersion,
+            professionId: dto.professionId,
+            skillTierId: skillTier.id,
+            category: input.category,
+            outputItemId: input.outputItem.id,
+            outputQuantityMin: input.outputQuantityMin,
+            outputQuantityMax: input.outputQuantityMax,
+            isComplete: complete,
+          },
+        });
+        await tx.recipeReagent.deleteMany({
+          where: { recipeId: recipe.id },
+        });
+        await tx.recipeReagent.createMany({
+          data: input.reagents.map((reagent) => ({
+            recipeId: recipe.id,
+            itemId: reagent.item.id,
+            quantity: reagent.quantity,
+            isOptional: reagent.isOptional ?? false,
+            affectedByResourcefulness: false,
+          })),
+        });
+        result.imported += 1;
+        if (complete) result.complete += 1;
+        else result.incomplete += 1;
+      }
+      return result;
+    });
+
+    this.cache.invalidatePrefix('crafting:');
     return summary;
   }
 
@@ -349,6 +538,20 @@ export class RecipesService {
         );
       }
       seen.add(reagent.itemId);
+    }
+  }
+
+  private assertUniqueCatalogReagents(
+    reagents: ImportClassicForeverCatalogDto['recipes'][number]['reagents'],
+  ): void {
+    const seen = new Set<number>();
+    for (const reagent of reagents) {
+      if (seen.has(reagent.item.id)) {
+        throw new BadRequestException(
+          `Reagent item ${reagent.item.id} is listed more than once`,
+        );
+      }
+      seen.add(reagent.item.id);
     }
   }
 }

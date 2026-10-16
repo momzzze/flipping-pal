@@ -89,6 +89,7 @@ export function SettingsView({ status }: { status: Status | undefined }) {
   const activeProfessionId = professionId ?? professions.data?.[0]?.id
   const modifiers = useModifiers(activeProfessionId)
   const [realmId, setRealmId] = useState<string>('')
+  const isClassicForever = status?.targetExpansionName.toLowerCase().includes('forever') ?? false
 
   return (
     <div className="grid flex-1 auto-rows-min grid-cols-1 gap-4 overflow-y-auto p-6 xl:grid-cols-2">
@@ -101,7 +102,7 @@ export function SettingsView({ status }: { status: Status | undefined }) {
           <KeyValue label="Region">{status?.region ?? '—'}</KeyValue>
           <KeyValue label="Target expansion">{status?.targetExpansionName ?? '—'}</KeyValue>
           <KeyValue label="Blizzard API credentials">
-            {status?.blizzardConfigured ? <Badge variant="success">Configured</Badge> : <Badge variant="secondary">Missing</Badge>}
+            {isClassicForever ? <Badge variant="secondary">Disabled for Classic Forever</Badge> : status?.blizzardConfigured ? <Badge variant="success">Configured</Badge> : <Badge variant="secondary">Missing</Badge>}
           </KeyValue>
           <KeyValue label="Price data">
             <DataModeBadge status={status} />
@@ -119,24 +120,28 @@ export function SettingsView({ status }: { status: Status | undefined }) {
           <KeyValue label="Auto refresh">
             {status?.autoRefreshMinutes ? `every ${status.autoRefreshMinutes} min` : 'disabled'}
           </KeyValue>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              disabled={!status?.blizzardConfigured || mutations.sync.isPending}
-              onClick={() => mutations.sync.mutate(undefined)}
-            >
-              <RefreshCw className={mutations.sync.isPending ? 'animate-spin' : ''} />
-              {mutations.sync.isPending ? 'Syncing…' : 'Import Alchemy + refresh prices'}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!status?.blizzardConfigured || mutations.refreshCommodities.isPending}
-              onClick={() => mutations.refreshCommodities.mutate(true)}
-            >
-              Force commodity refresh
-            </Button>
-          </div>
+          {isClassicForever ? (
+            <p className="mt-4 text-sm text-muted-foreground">Blizzard Retail imports are disabled. The Classic Forever catalog importer is available; auction-scan ingestion is not implemented yet.</p>
+          ) : (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={!status?.blizzardConfigured || mutations.sync.isPending}
+                onClick={() => mutations.sync.mutate(undefined)}
+              >
+                <RefreshCw className={mutations.sync.isPending ? 'animate-spin' : ''} />
+                {mutations.sync.isPending ? 'Syncing…' : 'Import Alchemy + refresh prices'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!status?.blizzardConfigured || mutations.refreshCommodities.isPending}
+                onClick={() => mutations.refreshCommodities.mutate(true)}
+              >
+                Force commodity refresh
+              </Button>
+            </div>
+          )}
           {mutations.sync.data && (
             <p className="mt-2 text-xs text-muted-foreground">
               Imported {mutations.sync.data.recipes.imported}/{mutations.sync.data.recipes.total} recipes (
@@ -148,7 +153,7 @@ export function SettingsView({ status }: { status: Status | undefined }) {
         </CardContent>
       </Card>
 
-      <Card>
+      {!isClassicForever && <Card>
         <CardHeader>
           <CardTitle>Crafting modifiers</CardTitle>
           <CardDescription>
@@ -179,9 +184,9 @@ export function SettingsView({ status }: { status: Status | undefined }) {
             </>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {!isClassicForever && <Card>
         <CardHeader>
           <CardTitle>Connected realms</CardTitle>
           <CardDescription>
@@ -228,9 +233,9 @@ export function SettingsView({ status }: { status: Status | undefined }) {
           )}
           <InlineError error={mutations.syncRealms.error ?? mutations.refreshRealm.error} />
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {!isClassicForever && <Card>
         <CardHeader>
           <CardTitle>Sample data</CardTitle>
           <CardDescription>
@@ -252,7 +257,7 @@ export function SettingsView({ status }: { status: Status | undefined }) {
           </Button>
           <InlineError error={mutations.loadSample.error ?? mutations.clearSample.error} />
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   )
 }

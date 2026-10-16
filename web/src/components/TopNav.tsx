@@ -7,11 +7,12 @@ import type { Status } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { InlineError } from './ErrorState'
 
-export type View = 'dashboard' | 'watchlist' | 'recipes' | 'settings'
+export type View = 'dashboard' | 'watchlist' | 'scan' | 'recipes' | 'settings'
 
 const NAV: Array<{ view: View; label: string; icon: typeof LayoutDashboard }> = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { view: 'watchlist', label: 'Watchlist', icon: Star },
+  { view: 'scan', label: 'Scan Data', icon: Database },
   { view: 'recipes', label: 'Recipes', icon: ListChecks },
   { view: 'settings', label: 'Settings', icon: Settings },
 ]
@@ -29,6 +30,13 @@ export function DataModeBadge({ status }: { status: Status | undefined }) {
     return (
       <Badge variant="warning" title="Fictional demo prices – not live market data">
         <FlaskConical className="h-3 w-3" /> SAMPLE DATA
+      </Badge>
+    )
+  }
+  if (status.dataMode === 'SCAN') {
+    return (
+      <Badge variant="outline" title={`Auction scan imported ${status.latestScanSnapshot?.fetchedAt ?? ''}`}>
+        <Database className="h-3 w-3" /> SCAN DATA
       </Badge>
     )
   }
@@ -68,7 +76,7 @@ export function TopNav({ view, onViewChange, status }: { view: View; onViewChang
       <div className="ml-auto flex items-center gap-3">
         <InlineError error={refreshCommodities.error ?? sync.error} />
         <Badge variant="outline">
-          <Database className="h-3 w-3" /> {status?.region ?? 'EU'} · {status?.targetExpansionName ?? 'Midnight'}
+          <Database className="h-3 w-3" /> {status?.targetExpansionName ?? 'Classic Forever'}
         </Badge>
         <DataModeBadge status={status} />
         {configured && (

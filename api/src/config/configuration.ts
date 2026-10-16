@@ -51,9 +51,9 @@ export function loadConfiguration(
     blizzard: {
       clientId: env.BLIZZARD_CLIENT_ID?.trim() ?? '',
       clientSecret: env.BLIZZARD_CLIENT_SECRET?.trim() ?? '',
-      region: toRegion(env.BLIZZARD_REGION),
+      region: toRegion(env.BLIZZARD_REGION ?? 'us'),
       locale: env.BLIZZARD_LOCALE?.trim() || 'en_GB',
-      targetExpansionName: env.TARGET_EXPANSION_NAME?.trim() || 'Midnight',
+      targetExpansionName: env.TARGET_EXPANSION_NAME?.trim() || 'Forever',
       maxConcurrency: Math.max(1, toNumber(env.BLIZZARD_MAX_CONCURRENCY, 8)),
       maxRequestsPerSecond: Math.max(
         1,

@@ -24,10 +24,21 @@ export interface SnapshotDto {
   scope: AuctionScope;
   connectedRealmId: number | null;
   isSample: boolean;
+  source: string;
   fetchedAt: string;
   sourceLastModified: string | null;
   auctionCount: number;
   itemCount: number;
+}
+
+export interface SnapshotItemDto {
+  itemId: number;
+  itemName: string;
+  minUnitPrice: number;
+  marketUnitPrice: number;
+  medianUnitPrice: number;
+  totalQuantity: number;
+  listingCount: number;
 }
 
 export function toSnapshotDto(snapshot: AuctionSnapshot): SnapshotDto {
@@ -37,6 +48,7 @@ export function toSnapshotDto(snapshot: AuctionSnapshot): SnapshotDto {
     scope: snapshot.scope,
     connectedRealmId: snapshot.connectedRealmId,
     isSample: snapshot.isSample,
+    source: snapshot.source,
     fetchedAt: snapshot.fetchedAt.toISOString(),
     sourceLastModified: snapshot.sourceLastModified?.toISOString() ?? null,
     auctionCount: snapshot.auctionCount,
@@ -80,6 +92,61 @@ export class AuctionsService {
       take: Math.min(Math.max(limit, 1), 500),
     });
     return snapshots.map(toSnapshotDto);
+  }
+
+  async listSnapshotItems(
+    snapshotId: number,
+    options: { search?: string; limit?: number; offset?: number } = {},
+  ) {
+    const snapshot = await this.prisma.auctionSnapshot.findUnique({
+      where: { id: snapshotId },
+    });
+    if (!snapshot) throw new NotFoundException(`Snapshot ${snapshotId} not found`);
+
+    const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+    const offset = Math.max(options.offset ?? 0, 0);
+    const search = options.search?.trim();
+    const numericId = search && /^\d+$/.test(search) ? Number(search) : undefined;
+    const where: Prisma.ItemPriceSnapshotWhereInput = {
+      snapshotId,
+      ...(search
+        ? {
+            item: {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                ...(numericId ? [{ id: numericId }] : []),
+              ],
+            },
+          }
+        : {}),
+    };
+
+    const [total, rows] = await Promise.all([
+      this.prisma.itemPriceSnapshot.count({ where }),
+      this.prisma.itemPriceSnapshot.findMany({
+        where,
+        include: { item: { select: { name: true } } },
+        orderBy: { itemId: 'asc' },
+        skip: offset,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      snapshot: toSnapshotDto(snapshot),
+      total,
+      limit,
+      offset,
+      items: rows.map((row): SnapshotItemDto => ({
+        itemId: row.itemId,
+        itemName: row.item.name,
+        minUnitPrice: Number(row.minUnitPrice),
+        marketUnitPrice: Number(row.marketUnitPrice),
+        medianUnitPrice: Number(row.medianUnitPrice),
+        totalQuantity: row.totalQuantity,
+        listingCount: row.listingCount,
+      })),
+    };
   }
 
   async listConnectedRealms() {

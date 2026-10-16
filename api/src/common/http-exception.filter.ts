@@ -11,6 +11,7 @@ import { Response } from 'express';
 import {
   BlizzardApiError,
   BlizzardCredentialsMissingError,
+  BlizzardTargetUnsupportedError,
 } from '../blizzard/blizzard.errors';
 
 /** Maps domain errors (Blizzard, Prisma) to meaningful HTTP responses. */
@@ -31,6 +32,14 @@ export class AppExceptionFilter extends BaseExceptionFilter {
       send(
         HttpStatus.SERVICE_UNAVAILABLE,
         'BlizzardCredentialsMissing',
+        exception.message,
+      );
+      return;
+    }
+    if (exception instanceof BlizzardTargetUnsupportedError) {
+      send(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'BlizzardTargetUnsupported',
         exception.message,
       );
       return;

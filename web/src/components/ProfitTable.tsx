@@ -87,6 +87,11 @@ export function ProfitTable({ rows, isLoading, selectedRecipeId, onSelect }: Pro
                       <FlaskConical className="h-2.5 w-2.5" /> sample
                     </Badge>
                   )}
+                  {r.source === 'FOREVER_BETA' && (
+                    <Badge variant="outline" className="px-1 py-0 text-[0.6rem]">
+                      Classic Forever
+                    </Badge>
+                  )}
                   {r.manuallyEdited && (
                     <span title="Manually corrected recipe">
                       <Pencil className="h-3 w-3" />

@@ -9,6 +9,17 @@ export function DataModeBanner({ status }: { status: Status | undefined }) {
   const { loadSample, sync } = useDataMutations()
   if (!status) return null
 
+  if (status.targetExpansionName.toLowerCase().includes('forever')) {
+    return (
+      <div className="flex items-center gap-3 border-b bg-accent/40 px-4 py-2 text-sm">
+        <Info className="h-4 w-4 shrink-0 text-primary" />
+        <p className="text-muted-foreground">
+          <strong>CLASSIC FOREVER</strong> is selected. Blizzard Retail sync and Midnight sample data are disabled. {status.latestScanSnapshot ? 'Auction scan imported; select the captured server in Filters to price recipes.' : 'Import a SavedVariables auction scan to populate prices.'}
+        </p>
+      </div>
+    )
+  }
+
   if (status.dataMode === 'SAMPLE') {
     return (
       <div className="flex items-center gap-3 border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning">

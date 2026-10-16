@@ -5,6 +5,7 @@ import type { AppConfig, BlizzardConfig } from '../config/configuration';
 import {
   BlizzardApiError,
   BlizzardCredentialsMissingError,
+  BlizzardTargetUnsupportedError,
 } from './blizzard.errors';
 import {
   BlizzardTokenResponse,
@@ -58,7 +59,15 @@ export class BlizzardApiService {
   }
 
   get isConfigured(): boolean {
-    return this.config.clientId !== '' && this.config.clientSecret !== '';
+    return (
+      !this.isClassicForeverMode &&
+      this.config.clientId !== '' &&
+      this.config.clientSecret !== ''
+    );
+  }
+
+  get isClassicForeverMode(): boolean {
+    return this.config.targetExpansionName.toLowerCase().includes('forever');
   }
 
   get region(): BlizzardConfig['region'] {
@@ -152,6 +161,9 @@ export class BlizzardApiService {
   }
 
   private assertConfigured(): void {
+    if (this.isClassicForeverMode) {
+      throw new BlizzardTargetUnsupportedError();
+    }
     if (!this.isConfigured) throw new BlizzardCredentialsMissingError();
   }
 

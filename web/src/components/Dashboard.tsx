@@ -62,7 +62,12 @@ export function Dashboard({ watchlistMode = false, onEditRecipe }: DashboardProp
             {summary.best && <p className="truncate text-xs font-normal text-muted-foreground">{summary.best.recipeName}</p>}
           </SummaryCard>
           <SummaryCard label="Commodity prices">
-            {profits.data?.commoditySnapshot ? (
+            {profits.data?.realmSnapshot ? (
+              <>
+                {formatRelativeTime(profits.data.realmSnapshot.fetchedAt)}
+                <p className="text-xs font-normal text-muted-foreground">Classic Forever scan</p>
+              </>
+            ) : profits.data?.commoditySnapshot ? (
               <>
                 {formatRelativeTime(profits.data.commoditySnapshot.fetchedAt)}
                 <p className="text-xs font-normal text-muted-foreground">

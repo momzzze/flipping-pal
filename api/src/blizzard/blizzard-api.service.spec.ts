@@ -4,6 +4,7 @@ import { BlizzardApiService } from './blizzard-api.service';
 import {
   BlizzardApiError,
   BlizzardCredentialsMissingError,
+  BlizzardTargetUnsupportedError,
 } from './blizzard.errors';
 
 function jsonResponse(
@@ -21,7 +22,9 @@ function createService(env: Record<string, string> = {}): BlizzardApiService {
   const config = loadConfiguration({
     BLIZZARD_CLIENT_ID: 'client',
     BLIZZARD_CLIENT_SECRET: 'secret',
+    BLIZZARD_REGION: 'eu',
     BLIZZARD_MAX_RETRIES: '2',
+    TARGET_EXPANSION_NAME: 'Midnight',
     ...env,
   });
   return new BlizzardApiService(config, new CacheService());
@@ -55,6 +58,15 @@ describe('BlizzardApiService', () => {
     expect(service.isConfigured).toBe(false);
     await expect(service.getItem(1)).rejects.toBeInstanceOf(
       BlizzardCredentialsMissingError,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks all Blizzard requests for the Classic Forever target', async () => {
+    const service = createService({ TARGET_EXPANSION_NAME: 'Forever' });
+    expect(service.isConfigured).toBe(false);
+    await expect(service.getItem(1)).rejects.toBeInstanceOf(
+      BlizzardTargetUnsupportedError,
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });

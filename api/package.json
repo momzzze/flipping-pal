@@ -20,6 +20,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "import:classic-scan": "ts-node -r tsconfig-paths/register src/auctions/import-classic-scan.ts",
     "seed:sample": "nest build && node dist/sample/seed-sample.js",
     "postinstall": "prisma generate"
   },
@@ -29,8 +30,10 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/client": "^6.19.3",
+    "@types/luaparse": "^0.2.13",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
+    "luaparse": "^0.3.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

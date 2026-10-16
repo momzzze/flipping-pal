@@ -13,8 +13,8 @@ export type ItemQuality =
 
 export const ITEM_QUALITIES: ItemQuality[] = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY']
 
-export type DataSource = 'BLIZZARD' | 'MANUAL' | 'SAMPLE'
-export type DataMode = 'LIVE' | 'SAMPLE' | 'NONE'
+export type DataSource = 'BLIZZARD' | 'MANUAL' | 'SAMPLE' | 'FOREVER_BETA'
+export type DataMode = 'LIVE' | 'SAMPLE' | 'SCAN' | 'NONE'
 export type SellPriceStrategy = 'MIN' | 'MARKET'
 
 export interface Item {
@@ -39,12 +39,31 @@ export interface Snapshot {
   itemCount: number
 }
 
+export interface SnapshotItem {
+  itemId: number
+  itemName: string
+  minUnitPrice: number
+  marketUnitPrice: number
+  medianUnitPrice: number
+  totalQuantity: number
+  listingCount: number
+}
+
+export interface SnapshotItemsPage {
+  snapshot: Snapshot
+  total: number
+  limit: number
+  offset: number
+  items: SnapshotItem[]
+}
+
 export interface Status {
   region: string
   targetExpansionName: string
   blizzardConfigured: boolean
   dataMode: DataMode
   commoditySnapshot: Snapshot | null
+  latestScanSnapshot: Snapshot | null
   lastLiveSnapshot: Snapshot | null
   sampleDataLoaded: boolean
   recipes: { total: number; complete: number; incomplete: number }
@@ -151,6 +170,8 @@ export interface CraftingModifiers {
 export interface Recipe {
   id: number
   blizzardRecipeId: number | null
+  externalId: string | null
+  catalogVersion: string | null
   name: string
   professionId: number
   professionName: string

@@ -22,6 +22,8 @@ enum DataSource {
   BLIZZARD
   MANUAL
   SAMPLE
+  FOREVER_BETA
+  CLASSIC_FOREVER_SCAN
 }
 
 enum AuctionScope {
@@ -118,7 +120,9 @@ model Item {
 
 model Recipe {
   id                      Int              @id @default(autoincrement())
-  /// Blizzard recipe id (null for purely manual recipes).
+  externalId              String?
+  catalogVersion          String?
+  /// Blizzard recipe id; null for catalog and manual recipes.
   blizzardRecipeId        Int?             @unique
   name                    String
   professionId            Int
@@ -147,6 +151,7 @@ model Recipe {
 
   @@index([professionId])
   @@index([skillTierId])
+  @@unique([source, externalId])
 }
 
 model RecipeReagent {
@@ -183,6 +188,8 @@ model AuctionSnapshot {
   region             Region
   scope              AuctionScope
   connectedRealmId   Int?
+  source             DataSource          @default(BLIZZARD)
+  sourceScanId       String?
   /// Sample snapshots are fabricated demo data and must never be presented as live prices.
   isSample           Boolean             @default(false)
   /// Last-Modified header returned by Blizzard, used for conditional requests.
@@ -193,6 +200,7 @@ model AuctionSnapshot {
   prices             ItemPriceSnapshot[]
 
   @@index([region, scope, connectedRealmId, fetchedAt])
+  @@unique([source, sourceScanId])
 }
 
 /// Aggregated per-item price data for a snapshot. Active listings = supply, not demand.
